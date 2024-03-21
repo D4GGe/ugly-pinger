@@ -1,0 +1,65 @@
+<head>
+  <title>Onmo pingtester</title>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const url = 'https://streaming-api.appland-stream.com/api/streaming-games/edge-node/device-info';
+  const body = { userId: "6c8bfedc-af17-43fb-bf46-32f561c04f15", userConfiguration: { isLocationAgent: true, overflowToPublicDataCenters: true, vip: false } }
+  const socket = io();
+  async function main() {
+    const deviceinfo = await fetch(url, { method: 'POST', body: JSON.stringify(body) })
+      .then(response => response.json())
+      .then(data => {
+        return data;
+      })
+      .catch(error => {
+        console.error('Error:', error);
+      });
+    console.log(deviceinfo);
+    setInterval(() => {
+      socket.emit('ping', Date.now());
+    }, 100);
+    
+    let results = [];
+    let totMeasurements = 0;
+    socket.on('pong', (ts) => {
+      results.push(Date.now() - ts);
+      totMeasurements++;
+      if (totMeasurements > 500) {
+        document.getElementById("mainText").textContent="data sent to server, Thank you!";
+      }else{
+        document.getElementById("mainText").textContent="Testing... " + totMeasurements/20 + "%";
+      }
+      
+      if (results.length >= 20) {
+        sendResults(deviceinfo.deviceInfoId, results);
+        results = [];
+      }
+    });
+
+    async function sendResults(deviceinfo, data) {
+      const sum = data.reduce((a, b) => a + b, 0);
+      const avg = sum / data.length;
+      const result = { rttRegionMeasurements: { "ethiotel-mp-socket": { default: { rtt: avg, raw:JSON.stringify(data) } } } }
+      const response = await fetch(`https://streaming-api.appland-stream.com/api/streaming-games/edge-node/device-info/${deviceinfo}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(result)
+      })
+
+
+      console.log(response);
+    }
+  }
+
+  main().then(console.log).catch(console.error);
+
+
+
+</script>
+</head>
+<body>
+  <h1>Onmo pingtester</h1>
+  <p id="mainText"></span></p>
+</body>
